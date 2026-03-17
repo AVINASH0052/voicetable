@@ -215,24 +215,38 @@ function parseFeedbackFromExtractedData(
   };
 }
 
-export async function syncInProgressCallsFromBolna(limit = 8): Promise<void> {
+export async function syncInProgressCallsFromBolna(limit = 20): Promise<void> {
   const settings = await prisma.settings.findUnique({ where: { id: "default" } });
   const bolnaApiKey = settings?.bolnaApiKey || process.env.BOLNA_API_KEY || "";
 
   if (!bolnaApiKey) return;
 
-  const calls = await prisma.call.findMany({
+  // Priority 1: Calls still in active states (most urgent — user sees these as stuck)
+  const activeCalls = await prisma.call.findMany({
     where: {
       executionId: { not: null },
-      OR: [
-        { status: { in: ["queued", "in-progress", "initiated", "call-disconnected", "ringing"] } },
-        { transcript: null },
-        { extractedData: null },
-      ],
+      status: { in: ["queued", "in-progress", "initiated", "call-disconnected", "ringing"] },
     },
-    orderBy: { updatedAt: "asc" },
+    orderBy: { createdAt: "desc" },
     take: limit,
   });
+
+  // Priority 2: Completed calls missing transcript/extractedData (backfill)
+  const remaining = limit - activeCalls.length;
+  const backfillCalls =
+    remaining > 0
+      ? await prisma.call.findMany({
+          where: {
+            executionId: { not: null },
+            status: { notIn: ["queued", "in-progress", "initiated", "call-disconnected", "ringing"] },
+            OR: [{ transcript: null }, { extractedData: null }],
+          },
+          orderBy: { updatedAt: "asc" },
+          take: remaining,
+        })
+      : [];
+
+  const calls = [...activeCalls, ...backfillCalls];
 
   for (const call of calls) {
     if (!call.executionId) continue;
