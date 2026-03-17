@@ -77,6 +77,28 @@ function getConfirmationStatusFromTranscript(transcript: string | null): string 
     }
   }
 
+  // Fallback for agents that summarize naturally but do not emit structured extraction.
+  const hasCancelSignal =
+    normalized.includes("cancel") || normalized.includes("cancellation reason");
+  if (hasCancelSignal) return "cancelled";
+
+  const hasConfirmationFlow =
+    normalized.includes("confirm the items") &&
+    normalized.includes("confirm the delivery address") &&
+    normalized.includes("confirm your payment method");
+
+  const hasWrapUpSignal =
+    normalized.includes("just to wrap up") ||
+    normalized.includes("to summarize") ||
+    normalized.includes("thank you for confirming");
+
+  const hasDeliveryCommitment =
+    normalized.includes("your order") && normalized.includes("will be delivered");
+
+  if ((hasConfirmationFlow && hasWrapUpSignal) || hasDeliveryCommitment) {
+    return "confirmed";
+  }
+
   return null;
 }
 
@@ -250,7 +272,7 @@ export async function syncInProgressCallsFromBolna(limit = 8): Promise<void> {
         });
       }
 
-      if (call.orderId) {
+      if (call.orderId && call.agentType === "confirmation") {
         const confirmationStatus =
           getConfirmationStatus(extractedDataValue) ||
           getConfirmationStatusFromTranscript(
