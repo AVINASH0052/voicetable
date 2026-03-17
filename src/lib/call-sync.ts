@@ -58,6 +58,28 @@ function getConfirmationStatus(extractedData: Record<string, unknown> | null): s
   return null;
 }
 
+function getConfirmationStatusFromTranscript(transcript: string | null): string | null {
+  if (!transcript) return null;
+
+  const normalized = transcript.toLowerCase();
+  const marker = "confirmation status:";
+  const markerIndex = normalized.indexOf(marker);
+
+  if (markerIndex >= 0) {
+    const afterMarker = normalized
+      .slice(markerIndex + marker.length)
+      .replace(/^[\s*:_-]+/, "")
+      .trim();
+    if (afterMarker.startsWith("confirmed")) return "confirmed";
+    if (afterMarker.startsWith("modified")) return "modified";
+    if (afterMarker.startsWith("cancelled") || afterMarker.startsWith("canceled")) {
+      return "cancelled";
+    }
+  }
+
+  return null;
+}
+
 export async function syncInProgressCallsFromBolna(limit = 8): Promise<void> {
   const settings = await prisma.settings.findUnique({ where: { id: "default" } });
   const bolnaApiKey = settings?.bolnaApiKey || process.env.BOLNA_API_KEY || "";
@@ -66,8 +88,12 @@ export async function syncInProgressCallsFromBolna(limit = 8): Promise<void> {
 
   const calls = await prisma.call.findMany({
     where: {
-      status: "in-progress",
       executionId: { not: null },
+      OR: [
+        { status: { in: ["queued", "in-progress", "initiated", "call-disconnected", "ringing"] } },
+        { transcript: null },
+        { extractedData: null },
+      ],
     },
     orderBy: { updatedAt: "asc" },
     take: limit,
@@ -111,10 +137,15 @@ export async function syncInProgressCallsFromBolna(limit = 8): Promise<void> {
         });
       }
 
-      if (call.orderId && extractedDataValue) {
-        const confirmationStatus = getConfirmationStatus(extractedDataValue);
+      if (call.orderId) {
+        const confirmationStatus =
+          getConfirmationStatus(extractedDataValue) ||
+          getConfirmationStatusFromTranscript(
+            typeof transcriptValue === "string" ? transcriptValue : transcript
+          );
+
         if (confirmationStatus) {
-          const specialInstructionsRaw = extractedDataValue.special_instructions;
+          const specialInstructionsRaw = extractedDataValue?.special_instructions;
           const specialInstructions =
             typeof specialInstructionsRaw === "string" && specialInstructionsRaw.trim()
               ? specialInstructionsRaw
