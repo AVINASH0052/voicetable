@@ -16,6 +16,73 @@ interface TranscriptMessage {
   text: string;
 }
 
+function normalizeRole(role: string): string {
+  const value = role.toLowerCase();
+  if (value === "assistant" || value === "agent" || value === "ai") return "agent";
+  if (value === "user" || value === "customer" || value === "human") return "user";
+  return "agent";
+}
+
+function parseTranscript(rawTranscript: string | null): TranscriptMessage[] {
+  if (!rawTranscript) return [];
+
+  try {
+    const parsed = JSON.parse(rawTranscript) as unknown;
+
+    if (Array.isArray(parsed)) {
+      return parsed
+        .map((item) => {
+          if (!item || typeof item !== "object") return null;
+          const entry = item as Record<string, unknown>;
+          const roleValue =
+            typeof entry.role === "string"
+              ? entry.role
+              : typeof entry.speaker === "string"
+                ? entry.speaker
+                : "agent";
+          const textValue =
+            typeof entry.text === "string"
+              ? entry.text
+              : typeof entry.message === "string"
+                ? entry.message
+                : typeof entry.content === "string"
+                  ? entry.content
+                  : null;
+
+          if (!textValue) return null;
+          return { role: normalizeRole(roleValue), text: textValue };
+        })
+        .filter((entry): entry is TranscriptMessage => entry !== null);
+    }
+
+    if (typeof parsed === "string") {
+      return parsed
+        .split("\n")
+        .map((line) => line.trim())
+        .filter(Boolean)
+        .map((line) => {
+          if (line.toLowerCase().startsWith("assistant:")) {
+            return {
+              role: "agent",
+              text: line.slice("assistant:".length).trim(),
+            };
+          }
+          if (line.toLowerCase().startsWith("user:")) {
+            return {
+              role: "user",
+              text: line.slice("user:".length).trim(),
+            };
+          }
+          return { role: "agent", text: line };
+        });
+    }
+  } catch {
+    return [];
+  }
+
+  return [];
+}
+
 interface Call {
   id: string;
   executionId: string | null;
@@ -51,14 +118,9 @@ function StatusBadge({ status }: { status: string }) {
 
 function CallRow({ call }: { call: Call }) {
   const [expanded, setExpanded] = useState(false);
-  let transcript: TranscriptMessage[] = [];
+  const transcript = parseTranscript(call.transcript);
   let extractedData: Record<string, unknown> = {};
 
-  try {
-    if (call.transcript) transcript = JSON.parse(call.transcript);
-  } catch {
-    /* empty */
-  }
   try {
     if (call.extractedData) extractedData = JSON.parse(call.extractedData);
   } catch {
