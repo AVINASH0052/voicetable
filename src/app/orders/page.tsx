@@ -195,31 +195,32 @@ export default function OrdersPage() {
             <p className="text-muted-foreground">No orders found</p>
           </div>
         ) : (
-          <table className="w-full">
+          <div className="overflow-x-auto">
+          <table className="w-full min-w-[800px]">
             <thead>
               <tr className="border-b border-border bg-muted/50">
-                <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">
                   Order
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">
                   Customer
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
                   Items
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">
                   Amount
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">
                   Payment
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">
                   Status
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">
                   Date
                 </th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground uppercase tracking-wider whitespace-nowrap">
                   Actions
                 </th>
               </tr>
@@ -229,12 +230,12 @@ export default function OrdersPage() {
                 const items: OrderItem[] = JSON.parse(order.items);
                 return (
                   <tr key={order.id} className="hover:bg-muted/30 transition-colors">
-                    <td className="px-6 py-4">
+                    <td className="px-4 py-4 whitespace-nowrap">
                       <span className="text-sm font-mono font-medium text-foreground">
                         #{order.orderId}
                       </span>
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-4 py-4 whitespace-nowrap">
                       <p className="text-sm font-medium text-foreground">
                         {order.customerName}
                       </p>
@@ -242,17 +243,17 @@ export default function OrdersPage() {
                         {order.customerPhone}
                       </p>
                     </td>
-                    <td className="px-6 py-4">
-                      <p className="text-sm text-foreground max-w-xs truncate">
+                    <td className="px-4 py-4 max-w-[220px]">
+                      <p className="text-sm text-foreground truncate">
                         {items.map((i) => `${i.quantity}x ${i.name}`).join(", ")}
                       </p>
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-4 py-4 whitespace-nowrap">
                       <span className="text-sm font-semibold text-foreground">
                         ₹{order.totalAmount}
                       </span>
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-4 py-4 whitespace-nowrap">
                       <span
                         className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
                           order.paymentMethod === "COD"
@@ -263,19 +264,19 @@ export default function OrdersPage() {
                         {order.paymentMethod}
                       </span>
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-4 py-4 whitespace-nowrap">
                       <StatusBadge status={order.status} />
                     </td>
-                    <td className="px-6 py-4 text-sm text-muted-foreground">
+                    <td className="px-4 py-4 text-sm text-muted-foreground whitespace-nowrap">
                       {format(new Date(order.createdAt), "MMM d, h:mm a")}
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-4 py-4 whitespace-nowrap">
                       <div className="flex items-center justify-end gap-2">
                         {order.status === "pending" && (
                           <button
                             onClick={() => triggerCall(order.id, "confirmation")}
                             disabled={callingId === order.id}
-                            className="flex items-center gap-1.5 rounded-lg bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-100 transition-colors disabled:opacity-50"
+                            className="flex items-center gap-1.5 rounded-lg bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-100 transition-colors disabled:opacity-50 whitespace-nowrap"
                             title="Call to confirm"
                           >
                             <PhoneCall className="h-3.5 w-3.5" />
@@ -287,7 +288,7 @@ export default function OrdersPage() {
                           <button
                             onClick={() => triggerCall(order.id, "feedback")}
                             disabled={callingId === order.id}
-                            className="flex items-center gap-1.5 rounded-lg bg-pink-50 px-3 py-1.5 text-xs font-medium text-pink-700 hover:bg-pink-100 transition-colors disabled:opacity-50"
+                            className="flex items-center gap-1.5 rounded-lg bg-pink-50 px-3 py-1.5 text-xs font-medium text-pink-700 hover:bg-pink-100 transition-colors disabled:opacity-50 whitespace-nowrap"
                             title="Call for feedback"
                           >
                             <MessageSquareHeart className="h-3.5 w-3.5" />
@@ -301,6 +302,7 @@ export default function OrdersPage() {
               })}
             </tbody>
           </table>
+          </div>
         )}
       </div>
 
