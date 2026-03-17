@@ -5,10 +5,10 @@ export async function GET() {
   const settings = await prisma.settings.findUnique({ where: { id: "default" } });
   if (!settings) {
     return NextResponse.json({
-      bolnaApiKey: "",
-      confirmationAgentId: "",
-      feedbackAgentId: "",
-      restaurantName: "",
+      bolnaApiKey: process.env.BOLNA_API_KEY ? `${process.env.BOLNA_API_KEY.slice(0, 8)}...` : "",
+      confirmationAgentId: process.env.CONFIRMATION_AGENT_ID || "",
+      feedbackAgentId: process.env.FEEDBACK_AGENT_ID || "",
+      restaurantName: process.env.RESTAURANT_NAME || "",
       restaurantPhone: "",
     });
   }

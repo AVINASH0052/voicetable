@@ -26,12 +26,17 @@ export async function POST(req: NextRequest) {
 
   // Get settings
   const settings = await prisma.settings.findUnique({ where: { id: "default" } });
-  if (!settings?.bolnaApiKey) {
+  const bolnaApiKey = settings?.bolnaApiKey || process.env.BOLNA_API_KEY || "";
+  const confirmationAgentId =
+    settings?.confirmationAgentId || process.env.CONFIRMATION_AGENT_ID || "";
+  const feedbackAgentId = settings?.feedbackAgentId || process.env.FEEDBACK_AGENT_ID || "";
+  const restaurantName = settings?.restaurantName || process.env.RESTAURANT_NAME || "Restaurant";
+
+  if (!bolnaApiKey) {
     return NextResponse.json({ error: "Bolna API key not configured" }, { status: 400 });
   }
 
-  const agentId =
-    agentType === "feedback" ? settings.feedbackAgentId : settings.confirmationAgentId;
+  const agentId = agentType === "feedback" ? feedbackAgentId : confirmationAgentId;
 
   if (!agentId) {
     return NextResponse.json({ error: `${agentType} agent ID not configured` }, { status: 400 });
@@ -56,7 +61,7 @@ export async function POST(req: NextRequest) {
   // Build user_data for Bolna agent context
   const userData: Record<string, string> = {
     customer_name: name,
-    restaurant_name: settings.restaurantName,
+    restaurant_name: restaurantName,
   };
 
   if (order) {
@@ -70,7 +75,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const bolnaRes = await triggerBolnaCall(settings.bolnaApiKey, agentId, phone, userData);
+    const bolnaRes = await triggerBolnaCall(bolnaApiKey, agentId, phone, userData);
 
     // Create call record
     const call = await prisma.call.create({
@@ -87,6 +92,23 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ call, bolnaResponse: bolnaRes }, { status: 201 });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
-    return NextResponse.json({ error: message }, { status: 500 });
+    console.error("Failed to trigger Bolna call", {
+      agentType,
+      orderId,
+      phone,
+      message,
+    });
+
+    const status = message.includes("(503)") ? 503 : 500;
+    return NextResponse.json(
+      {
+        error: message,
+        hint:
+          status === 503
+            ? "Bolna upstream returned 503. Verify the agent can place outbound calls from the Bolna dashboard and retry."
+            : undefined,
+      },
+      { status }
+    );
   }
 }
