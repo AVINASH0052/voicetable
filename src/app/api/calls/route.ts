@@ -1,8 +1,11 @@
 import { prisma } from "@/lib/prisma";
 import { triggerBolnaCall } from "@/lib/bolna";
+import { syncInProgressCallsFromBolna } from "@/lib/call-sync";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(req: NextRequest) {
+  await syncInProgressCallsFromBolna();
+
   const { searchParams } = new URL(req.url);
   const agentType = searchParams.get("agentType");
   const status = searchParams.get("status");

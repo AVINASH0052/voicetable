@@ -1,7 +1,11 @@
 import { prisma } from "@/lib/prisma";
+import { syncInProgressCallsFromBolna } from "@/lib/call-sync";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(req: NextRequest) {
+  // Keep order/call data fresh even if webhook delivery is delayed.
+  await syncInProgressCallsFromBolna();
+
   const { searchParams } = new URL(req.url);
   const status = searchParams.get("status");
   const search = searchParams.get("search");
