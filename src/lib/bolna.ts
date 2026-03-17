@@ -1,4 +1,4 @@
-const BOLNA_API_BASE = "https://api.bolna.dev/v2";
+const BOLNA_API_BASE = process.env.BOLNA_API_BASE_URL || "https://api.bolna.ai";
 
 interface BolnaCallPayload {
   agent_id: string;
@@ -45,7 +45,7 @@ export async function getBolnaCallDetails(
   apiKey: string,
   executionId: string
 ) {
-  const res = await fetch(`${BOLNA_API_BASE}/call/${executionId}`, {
+  const res = await fetch(`${BOLNA_API_BASE}/executions/${executionId}`, {
     headers: { Authorization: `Bearer ${apiKey}` },
   });
 
