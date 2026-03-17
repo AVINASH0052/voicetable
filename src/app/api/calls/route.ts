@@ -70,7 +70,16 @@ export async function POST(req: NextRequest) {
   if (order) {
     userData.order_id = order.orderId;
     const items = JSON.parse(order.items);
-    userData.order_items = items.map((i: { name: string; quantity: number }) => `${i.quantity}x ${i.name}`).join(", ");
+    const orderItemsText = items
+      .map((i: { name: string; quantity: number }) => `${i.quantity}x ${i.name}`)
+      .join(", ");
+
+    // Provide multiple aliases because different Bolna agent templates
+    // often reference different variable names.
+    userData.order_items = orderItemsText;
+    userData.items = orderItemsText;
+    userData.ordered_items = orderItemsText;
+    userData.order_summary = orderItemsText;
     userData.delivery_address = order.deliveryAddress;
     userData.payment_method = order.paymentMethod;
     userData.delivery_time = order.estimatedDelivery;
