@@ -80,6 +80,119 @@ function getConfirmationStatusFromTranscript(transcript: string | null): string 
   return null;
 }
 
+function parseNumberFromLine(line: string): number | null {
+  const match = line.match(/\b([1-5])\b/);
+  return match ? Number(match[1]) : null;
+}
+
+function parseFeedbackFromTranscript(transcript: string | null): {
+  foodRating?: number;
+  deliveryRating?: number;
+  favoriteDish?: string;
+  complaints?: string;
+  overallSentiment?: string;
+} | null {
+  if (!transcript) return null;
+
+  const lines = transcript
+    .split("\n")
+    .map((line) => line.replace(/^assistant:\s*/i, "").trim())
+    .filter(Boolean);
+
+  let foodRating: number | undefined;
+  let deliveryRating: number | undefined;
+  let favoriteDish: string | undefined;
+  let complaints: string | undefined;
+
+  for (const rawLine of lines) {
+    const line = rawLine.toLowerCase();
+
+    if (line.includes("food quality rating") || line.includes("food rating")) {
+      const n = parseNumberFromLine(rawLine);
+      if (n !== null) foodRating = n;
+    }
+
+    if (line.includes("delivery rating")) {
+      const n = parseNumberFromLine(rawLine);
+      if (n !== null) deliveryRating = n;
+    }
+
+    if (line.includes("delivery experience:")) {
+      if (line.includes("excellent")) deliveryRating = 5;
+      else if (line.includes("good") || line.includes("satisfactory")) deliveryRating = 4;
+      else if (line.includes("average")) deliveryRating = 3;
+      else if (line.includes("poor")) deliveryRating = 2;
+      else if (line.includes("bad")) deliveryRating = 1;
+    }
+
+    if (line.includes("favorite dish:")) {
+      const value = rawLine.split(":").slice(1).join(":").trim();
+      if (value && value.toLowerCase() !== "none") favoriteDish = value;
+    }
+
+    if (line.includes("suggestions/complaints:") || line.includes("complaints:")) {
+      const value = rawLine.split(":").slice(1).join(":").trim();
+      if (value && !["none", "n/a", "na"].includes(value.toLowerCase())) {
+        complaints = value;
+      }
+    }
+  }
+
+  if (
+    foodRating === undefined &&
+    deliveryRating === undefined &&
+    favoriteDish === undefined &&
+    complaints === undefined
+  ) {
+    return null;
+  }
+
+  let overallSentiment: string | undefined;
+  const scoreBase = (foodRating ?? 0) + (deliveryRating ?? 0);
+  if (complaints) overallSentiment = "negative";
+  else if (scoreBase >= 8) overallSentiment = "positive";
+  else if (scoreBase >= 5) overallSentiment = "neutral";
+  else if (scoreBase > 0) overallSentiment = "negative";
+
+  return {
+    foodRating,
+    deliveryRating,
+    favoriteDish,
+    complaints,
+    overallSentiment,
+  };
+}
+
+function parseFeedbackFromExtractedData(
+  extractedData: Record<string, unknown> | null
+): {
+  foodRating?: number;
+  deliveryRating?: number;
+  favoriteDish?: string;
+  complaints?: string;
+  overallSentiment?: string;
+} | null {
+  if (!extractedData) return null;
+
+  const foodRating = asNumber(extractedData.food_rating) ?? undefined;
+  const deliveryRating = asNumber(extractedData.delivery_rating) ?? undefined;
+  const favoriteDish = asString(extractedData.favorite_dish) ?? undefined;
+  const complaints = asString(extractedData.complaints) ?? undefined;
+  const overallSentiment = asString(extractedData.overall_sentiment) ?? undefined;
+
+  if (!foodRating && !deliveryRating && !favoriteDish && !complaints && !overallSentiment) {
+    return null;
+  }
+
+  return {
+    foodRating,
+    deliveryRating,
+    favoriteDish,
+    complaints,
+    overallSentiment,
+  };
+}
+
 export async function syncInProgressCallsFromBolna(limit = 8): Promise<void> {
   const settings = await prisma.settings.findUnique({ where: { id: "default" } });
   const bolnaApiKey = settings?.bolnaApiKey || process.env.BOLNA_API_KEY || "";
@@ -158,6 +271,39 @@ export async function syncInProgressCallsFromBolna(limit = 8): Promise<void> {
               specialInstructions,
             },
           });
+        }
+      }
+
+      if (call.agentType === "feedback") {
+        const existingFeedback = await prisma.feedback.findFirst({
+          where: { callId: call.id },
+          select: { id: true },
+        });
+
+        if (!existingFeedback) {
+          const feedbackFromExtractedData = parseFeedbackFromExtractedData(extractedDataValue);
+          const feedbackFromTranscript = parseFeedbackFromTranscript(
+            typeof transcriptValue === "string" ? transcriptValue : transcript
+          );
+          const feedbackData = feedbackFromExtractedData || feedbackFromTranscript;
+
+          if (feedbackData) {
+            await prisma.feedback.create({
+              data: {
+                callId: call.id,
+                orderId: call.orderId,
+                customerName: call.customerName,
+                customerPhone: call.customerPhone,
+                foodRating: feedbackData.foodRating ?? null,
+                deliveryRating: feedbackData.deliveryRating ?? null,
+                favoriteDish: feedbackData.favoriteDish ?? null,
+                complaints: feedbackData.complaints ?? null,
+                wouldRecommend: null,
+                overallSentiment: feedbackData.overallSentiment ?? null,
+                verbatimFeedback: null,
+              },
+            });
+          }
         }
       }
     } catch (error) {
