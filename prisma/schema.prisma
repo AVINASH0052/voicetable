@@ -1,0 +1,71 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model Order {
+  id                  String   @id @default(uuid())
+  orderId             String   @unique
+  customerName        String
+  customerPhone       String
+  items               String   // JSON string: [{name, quantity, price}]
+  deliveryAddress     String
+  paymentMethod       String   @default("COD") // COD | prepaid
+  estimatedDelivery   String   @default("")
+  totalAmount         Float    @default(0)
+  status              String   @default("pending") // pending | confirmed | modified | cancelled
+  specialInstructions String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  calls               Call[]
+}
+
+model Call {
+  id            String   @id @default(uuid())
+  executionId   String?  @unique
+  orderId       String?
+  order         Order?   @relation(fields: [orderId], references: [id])
+  agentType     String   // confirmation | feedback
+  status        String   @default("queued") // queued | in-progress | completed | failed
+  duration      Float?
+  transcript    String?  // JSON string
+  extractedData String?  // JSON string
+  summary       String?
+  cost          Float?
+  recordingUrl  String?
+  customerPhone String
+  customerName  String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model Feedback {
+  id               String   @id @default(uuid())
+  callId           String
+  orderId          String?
+  customerName     String
+  customerPhone    String
+  foodRating       Int?
+  deliveryRating   Int?
+  favoriteDish     String?
+  complaints       String?
+  wouldRecommend   Boolean?
+  overallSentiment String?  // positive | neutral | negative
+  verbatimFeedback String?
+  createdAt        DateTime @default(now())
+}
+
+model Settings {
+  id                    String @id @default("default")
+  bolnaApiKey           String @default("")
+  confirmationAgentId   String @default("")
+  feedbackAgentId       String @default("")
+  restaurantName        String @default("Spice Route Kitchen")
+  restaurantPhone       String @default("")
+  webhookSecret         String @default("")
+}
